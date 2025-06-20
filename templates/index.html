@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Aurora Activity Monitor</title>
+    <style>
+        body { font-family: Arial; padding: 2rem; background: #0c0f18; color: #cceeff; }
+        .kp-box { font-size: 2rem; border: 2px solid #44ccff; padding: 1rem; border-radius: 10px; width: fit-content; }
+    </style>
+</head>
+<body>
+    <h1>🌌 Aurora Activity Monitor</h1>
+    <div class="kp-box">
+        <p><strong>Kp Index:</strong> {{ kp.kp_index }}</p>
+        <p><strong>Estimated:</strong> {{ kp.estimated_kp }}</p>
+        <p><strong>Label:</strong> {{ kp.kp_label }}</p>
+        <p><strong>Time:</strong> {{ kp.time }}</p>
+    </div>
+	
+	<p id="location-display">📍 Detecting your location...</p>
+    <p id="forecast-message"></p>
+    <script>
+      // Pass Kp index from Flask to JS
+      const kpIndex = {{ kp.kp_index|default(0) }};
+      function requestUserLocation() {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const lat = position.coords.latitude;
+              const lon = position.coords.longitude;
+              document.getElementById("location-display").textContent =
+                `🌍 You are at Latitude: ${lat.toFixed(2)}, Longitude: ${lon.toFixed(2)}`;
+
+              // Simple forecast logic
+              let forecast = "";
+              if (kpIndex >= 7 && Math.abs(lat) >= 40) {
+                forecast = "🌟 High chance of auroras at your latitude!";
+              } else if (kpIndex >= 5 && Math.abs(lat) >= 50) {
+                forecast = "✨ Possible auroras at your latitude—look north!";
+              } else if (kpIndex >= 4 && Math.abs(lat) >= 60) {
+                forecast = "🌌 Auroras likely visible at your latitude.";
+              } else {
+                forecast = "ℹ️ Auroras unlikely at your latitude right now.";
+              }
+              document.getElementById("forecast-message").textContent = forecast;
+            },
+            (error) => {
+              document.getElementById("location-display").textContent =
+                "⚠️ Unable to retrieve location.";
+              // Fallback to default message
+              document.getElementById("forecast-message").textContent =
+                "{{ '✅ Auroras may be visible at mid-latitudes!' if kp.kp_index >= 5 else 'ℹ️ Auroras likely visible only near the poles.' }}";
+            }
+          );
+        } else {
+          document.getElementById("location-display").textContent =
+            "❌ Geolocation is not supported by this browser.";
+          document.getElementById("forecast-message").textContent =
+            "{{ '✅ Auroras may be visible at mid-latitudes!' if kp.kp_index >= 5 else 'ℹ️ Auroras likely visible only near the poles.' }}";
+        }
+      }
+      window.onload = requestUserLocation;
+    </script>
+
+    <!-- Remove or comment out the old Jinja forecast message -->
+    {# 
+    {% if kp.kp_index >= 5 %}
+        <h2>✅ Auroras may be visible at mid-latitudes!</h2>
+    {% else %}
+        <h2>ℹ️ Auroras likely visible only near the poles.</h2>
+    {% endif %}
+    #}
+</body>
+</html>
