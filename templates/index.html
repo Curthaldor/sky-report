@@ -30,16 +30,44 @@
               document.getElementById("location-display").textContent =
                 `🌍 You are at Latitude: ${lat.toFixed(2)}, Longitude: ${lon.toFixed(2)}`;
 
+              function getAuroraLikelihood(kp, lat) {
+                // Table: Kp index to lowest visible latitude
+                const kpLatTable = {
+                  9: 35,
+                  8: 40,
+                  7: 45,
+                  6: 50,
+                  5: 55,
+                  4: 60,
+                  3: 65,
+                  2: 67,
+                  1: 70
+                };
+                let thresholdLat = 70;
+                for (let k = kp; k >= 1; k--) {
+                  if (kpLatTable[k]) {
+                    thresholdLat = kpLatTable[k];
+                    break;
+                  }
+                }
+                const absLat = Math.abs(lat);
+                if (absLat >= thresholdLat) return 100;
+                // Decrease likelihood by 10% for each degree south of threshold, minimum 0%
+                let percent = 100 - (thresholdLat - absLat) * 10;
+                return Math.max(0, Math.round(percent));
+              }
+
               // Simple forecast logic
+              const likelihood = getAuroraLikelihood(kpIndex, lat);
               let forecast = "";
-              if (kpIndex >= 7 && Math.abs(lat) >= 40) {
-                forecast = "🌟 High chance of auroras at your latitude!";
-              } else if (kpIndex >= 5 && Math.abs(lat) >= 50) {
-                forecast = "✨ Possible auroras at your latitude—look north!";
-              } else if (kpIndex >= 4 && Math.abs(lat) >= 60) {
-                forecast = "🌌 Auroras likely visible at your latitude.";
+              if (likelihood === 100) {
+                forecast = "🌟 Auroras very likely at your latitude! (100%)";
+              } else if (likelihood >= 70) {
+                forecast = `✨ Good chance of auroras at your latitude! (${likelihood}%)`;
+              } else if (likelihood >= 30) {
+                forecast = `🌌 Low chance of auroras at your latitude. (${likelihood}%)`;
               } else {
-                forecast = "ℹ️ Auroras unlikely at your latitude right now.";
+                forecast = `ℹ️ Auroras very unlikely at your latitude. (${likelihood}%)`;
               }
               document.getElementById("forecast-message").textContent = forecast;
             },
