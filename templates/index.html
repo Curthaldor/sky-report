@@ -1,101 +1,117 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Aurora Activity Monitor</title>
-    <style>
-        body { font-family: Arial; padding: 2rem; background: #0c0f18; color: #cceeff; }
-        .kp-box { font-size: 2rem; border: 2px solid #44ccff; padding: 1rem; border-radius: 10px; width: fit-content; }
-    </style>
+	<title>Aurora Activity Monitor</title>
+	<style>
+		body { font-family: Arial; padding: 2rem; background: #0c0f18; color: #cceeff; }
+		.kp-box { font-size: 2rem; border: 2px solid #44ccff; padding: 1rem; border-radius: 10px; width: fit-content; }
+	</style>
 </head>
 <body>
-    <h1>🌌 Aurora Activity Monitor</h1>
-    <div class="kp-box">
-        <p><strong>Kp Index:</strong> {{ kp.kp_index }}</p>
-        <p><strong>Estimated:</strong> {{ kp.estimated_kp }}</p>
-        <p><strong>Label:</strong> {{ kp.kp_label }}</p>
-        <p><strong>Time:</strong> {{ kp.time }}</p>
-    </div>
+	<h1>🌌 Aurora Activity Monitor</h1>
+	<div class="kp-box">
+		<p><strong>Kp Index:</strong> {{ kp.kp_index }}</p>
+		<p><strong>Estimated:</strong> {{ kp.estimated_kp }}</p>
+		<p><strong>Label:</strong> {{ kp.kp_label }}</p>
+		<p><strong>Time:</strong> {{ kp.time }}</p>
+	</div>
 	
+	<p id="global-forecast-message"></p>
 	<p id="location-display">📍 Detecting your location...</p>
-    <p id="forecast-message"></p>
-    <script>
-      // Pass Kp index from Flask to JS
-      const kpIndex = {{ kp.kp_index|default(0) }};
-      function requestUserLocation() {
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const lat = position.coords.latitude;
-              const lon = position.coords.longitude;
-              document.getElementById("location-display").textContent =
-                `🌍 You are at Latitude: ${lat.toFixed(2)}, Longitude: ${lon.toFixed(2)}`;
+	<p id="forecast-message"></p>
+	
+	<script>
+	  // Pass Kp index from Flask to JS
+	  const kpIndex = {{ kp.kp_index|default(0) }};
 
-              function getAuroraLikelihood(kp, lat) {
-                // Table: Kp index to lowest visible latitude
-                const kpLatTable = {
-                  9: 35,
-                  8: 40,
-                  7: 45,
-                  6: 50,
-                  5: 55,
-                  4: 60,
-                  3: 65,
-                  2: 67,
-                  1: 70
-                };
-                let thresholdLat = 70;
-                for (let k = kp; k >= 1; k--) {
-                  if (kpLatTable[k]) {
-                    thresholdLat = kpLatTable[k];
-                    break;
-                  }
-                }
-                const absLat = Math.abs(lat);
-                if (absLat >= thresholdLat) return 100;
-                // Decrease likelihood by 10% for each degree south of threshold, minimum 0%
-                let percent = 100 - (thresholdLat - absLat) * 10;
-                return Math.max(0, Math.round(percent));
-              }
+	  // Table: Kp index to lowest visible latitude
+	  const kpLatTable = {
+		9: 35,
+		8: 40,
+		7: 45,
+		6: 50,
+		5: 55,
+		4: 60,
+		3: 65,
+		2: 67,
+		1: 70
+	  };
 
-              // Simple forecast logic
-              const likelihood = getAuroraLikelihood(kpIndex, lat);
-              let forecast = "";
-              if (likelihood === 100) {
-                forecast = "🌟 Auroras very likely at your latitude! (100%)";
-              } else if (likelihood >= 70) {
-                forecast = `✨ Good chance of auroras at your latitude! (${likelihood}%)`;
-              } else if (likelihood >= 30) {
-                forecast = `🌌 Low chance of auroras at your latitude. (${likelihood}%)`;
-              } else {
-                forecast = `ℹ️ Auroras very unlikely at your latitude. (${likelihood}%)`;
-              }
-              document.getElementById("forecast-message").textContent = forecast;
-            },
-            (error) => {
-              document.getElementById("location-display").textContent =
-                "⚠️ Unable to retrieve location.";
-              // Fallback to default message
-              document.getElementById("forecast-message").textContent =
-                "{{ '✅ Auroras may be visible at mid-latitudes!' if kp.kp_index >= 5 else 'ℹ️ Auroras likely visible only near the poles.' }}";
-            }
-          );
-        } else {
-          document.getElementById("location-display").textContent =
-            "❌ Geolocation is not supported by this browser.";
-          document.getElementById("forecast-message").textContent =
-            "{{ '✅ Auroras may be visible at mid-latitudes!' if kp.kp_index >= 5 else 'ℹ️ Auroras likely visible only near the poles.' }}";
-        }
-      }
-      window.onload = requestUserLocation;
-    </script>
+	  // General overview for the world
+	  function setGlobalForecast() {
+		let thresholdLat = 70;
+		for (let k = kpIndex; k >= 1; k--) {
+		  if (kpLatTable[k]) {
+			thresholdLat = kpLatTable[k];
+			break;
+		  }
+		}
+		let globalMsg = `🌎 With Kp=${kpIndex}, auroras may be visible as far south as latitude ${thresholdLat}°.`;
+		document.getElementById("global-forecast-message").textContent = globalMsg;
+		return thresholdLat;
+	  }
 
-    <!-- Remove or comment out the old Jinja forecast message -->
-    {# 
-    {% if kp.kp_index >= 5 %}
-        <h2>✅ Auroras may be visible at mid-latitudes!</h2>
-    {% else %}
-        <h2>ℹ️ Auroras likely visible only near the poles.</h2>
-    {% endif %}
-    #}
+	  function latDistanceKm(lat1, lat2) {
+		// 1 degree latitude ≈ 111.32 km
+		return Math.abs(lat1 - lat2) * 111.32;
+	  }
+
+	  function kmToMiles(km) {
+		return km * 0.621371;
+	  }
+
+	  function requestUserLocation() {
+		const thresholdLat = setGlobalForecast();
+		if (navigator.geolocation) {
+		  navigator.geolocation.getCurrentPosition(
+			(position) => {
+			  const lat = position.coords.latitude;
+			  const lon = position.coords.longitude;
+			  document.getElementById("location-display").textContent =
+				`🎯 You are at Latitude: ${lat.toFixed(2)}, Longitude: ${lon.toFixed(2)}`;
+
+			  // Calculate distance from threshold latitude
+			  const distKm = latDistanceKm(lat, thresholdLat);
+			  const distMi = kmToMiles(distKm);
+			  let direction = lat > thresholdLat ? "north" : "south";
+			  let forecast = `📏 You are ${distKm.toFixed(1)} km (${distMi.toFixed(1)} mi) ${direction} of the minimum latitude (${thresholdLat}°) for aurora visibility at Kp=${kpIndex}.<br>`;
+
+				// Add summary line
+				let summary = "";
+				if (Math.abs(lat) >= thresholdLat) {
+				summary = "🌟 You are within the aurora visibility zone. Auroras are likely if skies are dark and clear!";
+				} else if (distKm < 500) {
+				summary = "✨ You are close to the aurora zone. Auroras are possible on the northern horizon if activity increases.";
+				} else {
+				summary = "ℹ️ You are south of the typical aurora zone. Auroras are unlikely at your location right now.";
+				}
+
+			  document.getElementById("forecast-message").innerHTML = forecast + "<br><strong>" + summary + "</strong>";
+			},
+			(error) => {
+			  document.getElementById("location-display").textContent =
+				"⚠️ Unable to retrieve location.";
+			  document.getElementById("forecast-message").textContent =
+				"";
+			}
+		  );
+		} else {
+		  document.getElementById("location-display").textContent =
+			"❌ Geolocation is not supported by this browser.";
+		  document.getElementById("forecast-message").textContent =
+			"";
+		}
+	  }
+	  window.onload = requestUserLocation;
+	</script>
+
+	<!-- Remove or comment out the old Jinja forecast message -->
+	{# 
+	{% if kp.kp_index >= 5 %}
+		<h2>✅ Auroras may be visible at mid-latitudes!</h2>
+	{% else %}
+		<h2>ℹ️ Auroras likely visible only near the poles.</h2>
+	{% endif %}
+	#}
 </body>
 </html>
